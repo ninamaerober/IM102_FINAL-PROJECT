@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supabase Social Feed</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: #f9f9f9;
+    }
+    .top-bar {
+      background: #fff;
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
+      text-align: center;
+    }
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      background: #eee;
+      padding: 10px 0;
+    }
+    .nav-links a {
+      margin: 0 15px;
+      text-decoration: none;
+      color: #555;
+      font-weight: bold;
+    }
+    .nav-links a.active {
+      color: #d33;
+    }
+    #posts-container {
+      max-width: 1500px;
+      margin: 20px auto;
+    }
+    .post-container {
+      background: #fff;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 15px;
+    }
+    .post-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .post-header img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 10px;
+    }
+    .user-info span {
+      display: block;
+    }
+    .user-info span:first-child {
+      font-weight: bold;
+    }
+    .dropdown {
+      margin-left: auto;
+      position: relative;
+    }
+    .dropdown-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      right: 0;
+      top: 24px;
+      border-radius: 4px;
+      overflow: hidden;
+      z-index: 100;
+    }
+    .dropdown-content a {
+      display: block;
+      padding: 8px 12px;
+      text-decoration: none;
+      color: #333;
+    }
+    .dropdown-content a:hover {
+      background: #eee;
+    }
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+    .post-content p {
+      margin: 10px 0;
+      white-space: pre-wrap;
+    }
+    .post-content img {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    .post-footer {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+    .post-footer .action {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+    .post-footer .action img {
+      margin-right: 6px;
+    }
+    .post-footer .action.liked img {
+      filter: invert(33%) sepia(82%) saturate(3818%) hue-rotate(339deg) brightness(95%) contrast(89%);
+    }
+    .comment-section {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    .comment-section textarea {
+      flex: 1;
+      resize: vertical;
+      padding: 6px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .comment-section button {
+      padding: 6px 12px;
+      font-size: 14px;
+      border: none;
+      background-color: #d33;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: white;
+      border-top: 1px solid #ccc;
+      display: flex;
+      justify-content: space-around;
+      padding: 5px 0;
+    }
+    .bottom-nav a img {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <img src="twinkle.png" alt="Twinkle" height="40" />
+  </div>
+
+  <div class="nav-links">
+    <a href="#" class="active">For you</a>
+    <a href="#">Following</a>
+  </div>
+
+  <div id="posts-container"></div>
+
+  <div class="bottom-nav">
+    <a href="#"><img src="home.png" width="50" height="50" alt="Home"></a>
+    <a href="friend.html"><img src="light-search.jpg" width="50" height="50" alt="Search"></a>
+    <a href="post.html"><img src="light-add.jpg" width="50" height="50" alt="Add"></a>
+    <a href="hearts.html"><img src="light-heart.jpg" width="50" height="50" alt="Hearts"></a>
+    <a href="messages.html"><img src="chat.png" width="50" height="50" alt="Messages"></a>
+    <a href="profile.html"><img src="light-profile.jpg" width="50" height="50" alt="Profile"></a>
+  </div>
+
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+  const SUPABASE_URL = "https://umsgszmaubthunqwbnjn.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtc2dzem1hdWJ0aHVucXdibmpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg3NTgzNTQsImV4cCI6MjA2NDMzNDM1NH0.nD44sDzSrbfkMQ8P4maXq3g4ironGihaU2p0aBomT5I";
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null;
+
+  const forYouTab = document.querySelector('.nav-links a:first-child');
+  const followingTab = document.querySelector('.nav-links a:nth-child(2)');
+
+  let currentView = 'for-you';
+
+  async function loadPostsForYou() {
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        users (username, profile_pic),
+        post_reactions (user_id),
+        comments (id)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to fetch posts:', error);
+      return;
+    }
+
+    renderPosts(posts);
+  }
+
+  async function loadPostsFollowing() {
+    const { data: following, error: followErr } = await supabase
+      .from('followers')
+      .select('followed_id')
+      .eq('follower_id', currentUser.id);
+
+    if (followErr) {
+      console.error('Error loading following:', followErr);
+      return;
+    }
+
+    const followedIds = following.map(f => f.followed_id);
+    if (followedIds.length === 0) {
+      renderPosts([]); return;
+    }
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        users (username, profile_pic),
+        post_reactions (user_id),
+        comments (id)
+      `)
+      .in('user_id', followedIds)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to fetch posts:', error);
+      return;
+    }
+
+    renderPosts(posts);
+  }
+
+  function renderPosts(posts) {
+    const container = document.getElementById('posts-container');
+    container.innerHTML = '';
+
+    posts.forEach(post => {
+      const user = post.users;
+      const liked = post.post_reactions?.some(r => r.user_id === currentUser.id);
+      const commentCount = post.comments?.length || 0;
+      const reactionCount = post.post_reactions?.length || 0;
+
+      const postDiv = document.createElement('div');
+      postDiv.className = 'post-container';
+      postDiv.innerHTML = `
+        <div class="post-header">
+          <img src="${user?.profile_pic ? 'uploads/profile_pics/' + user.profile_pic : 'default-profile.jpg'}" />
+          <div class="user-info">
+            <span><strong>${user?.username || 'Unknown'}</strong></span>
+            <span>${new Date(post.created_at).toLocaleString()}</span>
+          </div>
+          ${post.user_id === currentUser.id ? `
+            <div class="dropdown">
+              <button class="dropdown-btn">•••</button>
+              <div class="dropdown-content">  
+                <a href="#" onclick="event.preventDefault(); deletePost(${post.id})">Delete</a>
+              </div>
+            </div>` : ''
+          }
+        </div>
+        <div class="post-content">
+          <p>${escapeHtml(post.content)}</p>
+          ${post.post_image ? `<img src="${post.post_image}" />` : ''}
+        </div>
+        <div class="post-footer">
+          <div class="action ${liked ? 'liked' : ''}">
+            <button onclick="toggleReaction(${post.id}, ${liked})" style="background: none; border: none;"><img src="light-heart.jpg" width="25" /></button>
+            <span>${reactionCount}</span>
+          </div>
+          <div class="action">
+            <img src="comment.png" width="25" />
+            <span>${commentCount}</span>
+          </div>
+          <div class="action">
+            <img src="share.png" width="25" />
+            <span>0</span>
+          </div>
+        </div>
+        <div class="comment-section">
+          <textarea placeholder="Add a comment..." id="comment-${post.id}"></textarea>
+          <button onclick="submitComment(${post.id})">Comment</button>
+        </div>
+      `;
+      container.appendChild(postDiv);
+    });
+  }
+
+  forYouTab.addEventListener('click', e => {
+    e.preventDefault();
+    currentView = 'for-you';
+    forYouTab.classList.add('active');
+    followingTab.classList.remove('active');
+    loadPostsForYou();
+  });
+
+  followingTab.addEventListener('click', e => {
+    e.preventDefault();
+    currentView = 'following';
+    followingTab.classList.add('active');
+    forYouTab.classList.remove('active');
+    loadPostsFollowing();
+  });
+
+  async function checkUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      window.location.href = 'login.html';
+    } else {
+      currentUser = user;
+      loadPosts();
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, match => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    })[match]);
+  }
+
+  // Dummy implementations:
+  function toggleReaction(postId, liked) {
+    alert(`Toggle like for post ${postId}, liked: ${liked}`);
+  }
+
+  function submitComment(postId) {
+    const comment = document.getElementById(`comment-${postId}`).value;
+    alert(`Comment on post ${postId}: ${comment}`);
+  }
+
+  function deletePost(postId) {
+    alert(`Delete post ${postId}`);
+  }
+
+  async function loadPosts() {
+    if (currentView === 'following') {
+      await loadPostsFollowing();
+    } else {
+      await loadPostsForYou();
+    }
+  }
+
+  checkUser();
+</script>
+</body>
+</html>
